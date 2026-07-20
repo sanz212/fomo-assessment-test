@@ -1,0 +1,46 @@
+services:
+  fomo_app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fomo_app
+    volumes:
+      - ./backend:/var/www/html
+    depends_on:
+      - fomo_db
+    networks:
+      - app-network
+
+  fomo_nginx:
+    image: nginx:1.27-alpine
+    container_name: fomo_nginx
+    ports:
+      - "8000:80"
+    volumes:
+      - ./backend:/var/www/html
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - fomo_app
+    networks:
+      - app-network
+
+  fomo_db:
+    image: postgres:16-alpine
+    container_name: fomo_db
+    environment:
+      POSTGRES_DB: fomo_store
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: rootpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - fomo_db_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  fomo_db_data:
