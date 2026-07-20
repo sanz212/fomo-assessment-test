@@ -34,8 +34,9 @@ Pastikan sudah terinstall:
 ## Clone Repository
 
 ```bash
-git clone <repository-url>
-
+git clone https://github.com/sanz212/fomo-assessment-test.git
+```
+```
 cd fomo-assessment-test
 ```
 
