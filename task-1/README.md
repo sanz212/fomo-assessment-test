@@ -37,7 +37,7 @@ Pastikan sudah terinstall:
 git clone https://github.com/sanz212/fomo-assessment-test.git
 ```
 ```
-cd fomo-assessment-test
+cd fomo-assessment-test/task-1
 ```
 
 ---
