@@ -5,7 +5,7 @@ use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductController;
 
 Route::prefix('products')->group(function () {
-    Route::post('/', [ProductController::class, 'store']); // LIST PRODUCT
+    Route::get('/', [ProductController::class, 'index']); // LIST PRODUCT
     Route::get('/{productId}', [ProductController::class, 'show']); // GET /api/products/1 (PRODUCT DETAIL)
 });
 
