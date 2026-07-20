@@ -2,10 +2,10 @@
 
 namespace App\Services;
 
+use App\Exceptions\InsufficientStockException;
 use App\Models\Order;
 use App\Models\Product;
 use Illuminate\Support\Facades\DB;
-use RuntimeException;
 
 class OrderService
 {
@@ -13,77 +13,86 @@ class OrderService
     {
         return DB::transaction(function () use ($data) {
 
-            $total = 0;
-            $products = [];
+            $products = $this->lockProducts($data['items']);
 
-            foreach ($data['items'] as $item) {
-
-                /**
-                 * Lock product row
-                 * Prevent race condition during flash sale
-                 */
-                $product = Product::lockForUpdate()
-                    ->find($item['product_id']);
-
-                if (!$product) {
-                    throw new RuntimeException(
-                        'Product not found'
-                    );
-                }
-
-
-                if ($product->stock < $item['quantity']) {
-                    throw new RuntimeException(
-                        "Insufficient stock for {$product->name}"
-                    );
-                }
-
-
-                $products[] = [
-                    'product' => $product,
-                    'quantity' => $item['quantity'],
-                ];
-
-
-                $total += $product->price * $item['quantity'];
-            }
-
-
-            /**
-             * Create order
-             */
             $order = Order::create([
-                'email' => $data['email'],
-                'total' => $total,
+                'email'  => $data['email'],
+                'total'  => $this->calculateTotal($products),
                 'status' => 'completed',
             ]);
 
+            $this->createOrderItems($order, $products);
 
-            /**
-             * Create order items
-             * And reduce inventory
-             */
-            foreach ($products as $item) {
+            return $order->load('items');
+        });
+    }
 
-                $product = $item['product'];
-                $quantity = $item['quantity'];
+    /**
+     * Lock product rows and validate stock.
+     */
+    private function lockProducts(array $items): array
+    {
+        $products = [];
 
+        foreach ($items as $item) {
 
-                $order->items()->create([
-                    'product_id' => $product->id,
-                    'quantity' => $quantity,
-                    'price' => $product->discount_price ?? $product->price,
-                ]);
+            $product = Product::lockForUpdate()
+                ->find($item['product_id']);
 
-
-                $product->decrement(
-                    'stock',
-                    $quantity
+            if ($product->stock < $item['quantity']) {
+                throw new InsufficientStockException(
+                    "Insufficient stock for {$product->name}"
                 );
             }
 
+            $products[] = [
+                'product' => $product,
+                'quantity' => $item['quantity'],
+            ];
+        }
 
-            return $order->load('items.product');
-        });
+        return $products;
+    }
+
+    /**
+     * Calculate order total.
+     */
+    private function calculateTotal(array $products): float
+    {
+        $total = 0;
+
+        foreach ($products as $item) {
+            $total += $this->getSellingPrice($item['product']) * $item['quantity'];
+        }
+
+        return $total;
+    }
+
+    /**
+     * Create order items and reduce stock.
+     */
+    private function createOrderItems(Order $order, array $products): void
+    {
+        foreach ($products as $item) {
+
+            $product = $item['product'];
+            $quantity = $item['quantity'];
+
+            $order->items()->create([
+                'product_id' => $product->id,
+                'quantity'   => $quantity,
+                'price'      => $this->getSellingPrice($product),
+            ]);
+
+            $product->decrement('stock', $quantity);
+        }
+    }
+
+    /**
+     * Get current selling price.
+     */
+    private function getSellingPrice(Product $product): float
+    {
+        return $product->discount_price ?? $product->price;
     }
 }

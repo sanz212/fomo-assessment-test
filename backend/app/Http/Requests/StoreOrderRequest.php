@@ -3,6 +3,8 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class StoreOrderRequest extends FormRequest
 {
@@ -53,5 +55,13 @@ class StoreOrderRequest extends FormRequest
 
             'items.*.quantity.min' => 'Quantity must be at least 1.',
         ];
+    }
+
+    protected function failedValidation(Validator $validator)
+    {
+        throw new HttpResponseException(response()->json([
+            'status'  => 'error',
+            'message' => $validator->errors()->first(),
+        ], 422));
     }
 }

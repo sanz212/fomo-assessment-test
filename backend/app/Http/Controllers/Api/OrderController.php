@@ -2,12 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Models\Order;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreOrderRequest;
+use App\Http\Requests\ShowOrderRequest;
+use App\Http\Resources\OrderResource;
 use App\Services\OrderService;
 use Illuminate\Http\JsonResponse;
-use RuntimeException;
-use Throwable;
 
 class OrderController extends Controller
 {
@@ -19,33 +20,31 @@ class OrderController extends Controller
 
     public function store(StoreOrderRequest $request): JsonResponse
     {
-        try {
+        $order = $this->orderService->createOrder(
+            $request->validated()
+        );
 
-            $order = $this->orderService->createOrder(
-                $request->validated()
-            );
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Order created successfully',
+            'data' => new OrderResource(
+                $order->load('items.product')
+            ),
+        ], 201);
+        
+    }
 
+    public function show(ShowOrderRequest $request, int $orderId): JsonResponse
+    {
+        $order = Order::with('items.product')
+            ->whereKey($orderId)
+            ->where('email', $request->validated('email'))
+            ->firstOrFail();
 
-            return response()->json([
-                'message' => 'Order created successfully',
-                'data' => $order,
-            ], 201);
-
-
-        } catch (RuntimeException $e) {
-
-            return response()->json([
-                'message' => $e->getMessage(),
-            ], 409);
-
-
-        } catch (Throwable $e) {
-
-            report($e);
-
-            return response()->json([
-                'message' => 'Something went wrong',
-            ], 500);
-        }
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Order retrieved successfully',
+            'data' => new OrderResource($order),
+        ], 200);
     }
 }
